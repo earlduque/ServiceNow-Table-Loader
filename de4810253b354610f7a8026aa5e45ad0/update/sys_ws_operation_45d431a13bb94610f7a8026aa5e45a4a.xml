@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?><record_update table="sys_ws_operation">
+    <sys_ws_operation action="INSERT_OR_UPDATE">
+        <active>true</active>
+        <consumes>application/json,application/xml,text/xml</consumes>
+        <consumes_customized>false</consumes_customized>
+        <default_operation_uri/>
+        <enforce_acl>cf9d01d3e73003009d6247e603f6a990</enforce_acl>
+        <http_method>POST</http_method>
+        <name>Default POST</name>
+        <operation_script><![CDATA[(function process( /*RESTAPIRequest*/ request, /*RESTAPIResponse*/ response) {
+
+	// Configuration variables for admins
+	const removedRecordAction = 'delete'; // 'delete' removed the record if it is deleted in GitHub, any other value here will attempt to set the record to active = false
+	const activeFieldName = 'active'; // change if the tables you are using have a different column name for active
+	const setActiveForNewRecords = true; // when new records are created, set activeFieldName as true
+	const storeFileContents = true; // if true, the entire GitHub file's contents will also be stored
+	const fileContentsField = 'script'; // field to store GitHub file's contents
+	const coalescingFields = { // corresponding tables and what field should be used to uniquely coalesce against the filename in GitHub
+		incident: 'short_description'
+	};
+
+    // Retrieve repository and commit data from the incoming request.
+    const repository = request.body.data.repository;
+    const commits = request.body.data.event.commits;
+    const log = []; // Initialize an array to keep track of processing logs.
+
+    // Process each commit if any.
+    if (commits) {
+        for (let i in commits) {
+            // Setup a new REST message for querying GitHub's commit API.
+            const rm = new sn_ws.RESTMessageV2();
+            rm.setHttpMethod('GET');
+            rm.setRequestHeader('accept', 'application/json');
+            rm.setEndpoint("https://api.github.com/repos/" + repository + "/commits/" + commits[i].id);
+            const r = rm.execute();
+            const files = JSON.parse(r.getBody()).files;
+
+            // Process each file changed in the commit.
+            for (let j in files) {
+				const table = files[j].filename.split('/')[0];
+                const parsers = new GlideRecord(table);
+
+                // Handle renamed files by updating their descriptions.
+                if (files[j].status == 'renamed') {
+                    if (parsers.get(coalescingFields[table], files[j].previous_filename.split("/")[1])) {
+                        parsers.setValue(coalescingFields[table], files[j].filename.split("/")[1]);
+                        parserUpdate(parsers, files[j].raw_url, 'update');
+                    }
+                }
+                // Handle removed files by deleting the record or setting the record to inactive.
+                else if (files[j].status == "removed") {
+                    if (parsers.get(coalescingFields[table], files[j].filename.split("/")[1])) {
+                        if (removedRecordAction === 'delete'){
+							parsers.deleteRecord();
+						} else {
+							parsers.setValue(activeFieldName, 'false');
+							parsers.update();
+						}
+                    }
+                }
+                // For added or modified files, either insert new records or update existing ones.
+                else {
+                    if (parsers.get(coalescingFields[table], files[j].filename.split("/")[1])) {
+                        parserUpdate(parsers, files[j].raw_url, 'update');
+                    } else {
+                        parsers.newRecord();
+                        if (setActiveForNewRecords === true) parsers.setValue(activeFieldName, 'true');
+                        parsers.setValue(coalescingFields[table], files[j].filename.split("/")[1]);
+                        parserUpdate(parsers, files[j].raw_url, 'insert');
+                    }
+                }
+            }
+        }
+    }
+
+    // Set response status to 200 and return a log of processing details.
+    response.setStatus(200);
+    response.setHeader('Content-Type', 'text/plain');
+    response.getStreamWriter().writeString('logged: ' + JSON.stringify(log));
+
+    // Function to update or insert parser records based on the file's raw content.
+    function parserUpdate(thisGr, raw_url, record_action) {
+        const rm2 = new sn_ws.RESTMessageV2();
+        rm2.setHttpMethod("GET");
+        rm2.setRequestHeader('accept', 'plain/text');
+        rm2.setEndpoint(raw_url);
+        const r2 = rm2.execute();
+        const js_raw = r2.getBody();
+        const js = js_raw.split('\n');
+
+		let useCommentBlock = false;
+
+        // Ensure the script starts with a comment block.
+        if (js[0].trim() === "/*") {
+            useCommentBlock = true;
+        }
+
+        // Parse the comment block for key-value pairs.
+        let i = useCommentBlock ? 1 : 0;
+        while (js[i].trim() != "*/" && i < js.length) {
+            const pair = js[i].split(/:(.*)/);
+            if (pair.length < 2) {
+                log.push("line " + (i + 1) + " was not a keypair");
+                i++;
+                continue;
+            } else {
+                thisGr.setValue(pair[0].trim(), pair[1].trim());
+                i++;
+            }
+        }
+        if (storeFileContents) thisGr.setValue(fileContentsField, js_raw);
+        if (record_action == 'added') thisGr.insert();
+        else thisGr.update();
+        log.push('record updated/inserted');
+    }
+
+})(request, response);]]></operation_script>
+        <operation_uri>/api/x_snc_cc_git_table/githubtableloader</operation_uri>
+        <produces>application/json,application/xml,text/xml</produces>
+        <produces_customized>false</produces_customized>
+        <relative_path>/</relative_path>
+        <request_example/>
+        <requires_acl_authorization>true</requires_acl_authorization>
+        <requires_authentication>true</requires_authentication>
+        <requires_snc_internal_role>true</requires_snc_internal_role>
+        <short_description/>
+        <sys_class_name>sys_ws_operation</sys_class_name>
+        <sys_created_by>earl.duque</sys_created_by>
+        <sys_created_on>2024-04-26 04:41:17</sys_created_on>
+        <sys_id>45d431a13bb94610f7a8026aa5e45a4a</sys_id>
+        <sys_mod_count>4</sys_mod_count>
+        <sys_name>Default POST</sys_name>
+        <sys_package display_value="GitHub Table Loader" source="x_snc_cc_git_table">de4810253b354610f7a8026aa5e45ad0</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="GitHub Table Loader">de4810253b354610f7a8026aa5e45ad0</sys_scope>
+        <sys_update_name>sys_ws_operation_45d431a13bb94610f7a8026aa5e45a4a</sys_update_name>
+        <sys_updated_by>earl.duque</sys_updated_by>
+        <sys_updated_on>2024-04-26 05:24:10</sys_updated_on>
+        <web_service_definition display_value="GitHubTableLoader">712435613bb94610f7a8026aa5e45a4b</web_service_definition>
+        <web_service_version/>
+    </sys_ws_operation>
+</record_update>
