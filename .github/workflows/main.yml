@@ -9,7 +9,9 @@ on:
   push:
     paths:
       - '*/**'
-    branches: [ "main" ]
+    paths-ignore:
+      - ".github/*"
+    # branches: [ "main" ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
