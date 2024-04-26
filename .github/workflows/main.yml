@@ -10,6 +10,7 @@ on:
     paths:
       - "*/*"
       - "!.github"
+      - "!de4810253b354610f7a8026aa5e45ad0"
     # branches: [ "main" ]
 
   # Allows you to run this workflow manually from the Actions tab
