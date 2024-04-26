@@ -10,11 +10,15 @@
         <operation_script><![CDATA[(function process( /*RESTAPIRequest*/ request, /*RESTAPIResponse*/ response) {
 
 	// Configuration variables for admins
-	const removedRecordAction = 'delete'; // 'delete' removed the record if it is deleted in GitHub, any other value here will attempt to set the record to active = false
+
+	const removedRecordAction = 'delete'; // determines what should be done with a table record if its corresponding GitHub file is deleted
+	// 'delete' removes the record if it is deleted in GitHub, any other value here will attempt to set the record to active = false, note that the delete cross-scope privilege is usually denied by default
+	// 'deactivate' sets the active field to false
+	// any other value will leave the record as is
 	const activeFieldName = 'active'; // change if the tables you are using have a different column name for active
 	const setActiveForNewRecords = true; // when new records are created, set activeFieldName as true
 	const storeFileContents = true; // if true, the entire GitHub file's contents will also be stored
-	const fileContentsField = 'script'; // field to store GitHub file's contents
+	const fileContentsField = 'description'; // field to store GitHub file's contents if storeFileContents = true
 	const coalescingFields = { // corresponding tables and what field should be used to uniquely coalesce against the filename in GitHub
 		incident: 'short_description'
 	};
@@ -51,10 +55,10 @@
                 else if (files[j].status == "removed") {
                     if (parsers.get(coalescingFields[table], files[j].filename.split("/")[1])) {
                         if (removedRecordAction === 'delete'){
-							parsers.deleteRecord();
-						} else {
+							log.push('attempting to delete record: ' + parsers.deleteRecord());
+						} else if (removedRecordAction === 'deactivate') {
 							parsers.setValue(activeFieldName, 'false');
-							parsers.update();
+							log.push('attempting to update record: ' + parsers.update());
 						}
                     }
                 }
@@ -66,7 +70,7 @@
                         parsers.newRecord();
                         if (setActiveForNewRecords === true) parsers.setValue(activeFieldName, 'true');
                         parsers.setValue(coalescingFields[table], files[j].filename.split("/")[1]);
-                        parserUpdate(parsers, files[j].raw_url, 'insert');
+                        parserUpdate(parsers, files[j].raw_url, 'added');
                     }
                 }
             }
@@ -109,9 +113,11 @@
             }
         }
         if (storeFileContents) thisGr.setValue(fileContentsField, js_raw);
-        if (record_action == 'added') thisGr.insert();
-        else thisGr.update();
-        log.push('record updated/inserted');
+        if (record_action == 'added') {
+			log.push('attempting to create record: ' + thisGr.insert());
+		} else {
+			log.push('attempting to update record: ' + thisGr.update());
+		}
     }
 
 })(request, response);]]></operation_script>
@@ -128,14 +134,14 @@
         <sys_created_by>earl.duque</sys_created_by>
         <sys_created_on>2024-04-26 04:41:17</sys_created_on>
         <sys_id>45d431a13bb94610f7a8026aa5e45a4a</sys_id>
-        <sys_mod_count>4</sys_mod_count>
+        <sys_mod_count>12</sys_mod_count>
         <sys_name>Default POST</sys_name>
         <sys_package display_value="GitHub Table Loader" source="x_snc_cc_git_table">de4810253b354610f7a8026aa5e45ad0</sys_package>
         <sys_policy/>
         <sys_scope display_value="GitHub Table Loader">de4810253b354610f7a8026aa5e45ad0</sys_scope>
         <sys_update_name>sys_ws_operation_45d431a13bb94610f7a8026aa5e45a4a</sys_update_name>
         <sys_updated_by>earl.duque</sys_updated_by>
-        <sys_updated_on>2024-04-26 05:24:10</sys_updated_on>
+        <sys_updated_on>2024-04-26 06:23:11</sys_updated_on>
         <web_service_definition display_value="GitHubTableLoader">712435613bb94610f7a8026aa5e45a4b</web_service_definition>
         <web_service_version/>
     </sys_ws_operation>
