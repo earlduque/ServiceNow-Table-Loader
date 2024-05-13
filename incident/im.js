@@ -1,3 +1,4 @@
 /*
-service:blackberry
-state:3
+close_notes:hello knowledge!
+*/
+const incGr = new GlideRecord('incident');
