@@ -4,6 +4,6 @@ category:software
 subcategory:email
 business_service:c69b36ac73d423002728660c4cf6a71d
 contact_type:email
-description: losing power here
+description: loss of all power
 */
 const incGr = new GlideRecord('incident');
